@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Delta Electronics — Line Balance System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1f2937;--border:#30363d;
+  --accent:#e31837;--accent2:#ff6b35;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
+  --green:#3fb950;--yellow:#d29922;--blue:#388bfd;--purple:#a5a0ff;--teal:#39d0d8;
+  --nva:#6e7681;--manpower:#3fb950;--machine:#388bfd;--testonly:#d29922;
+  --visual:#a5a0ff;--visualtest:#ff9f40;--manpowertest:#39d0d8;--manpowermachine:#e31837;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* LOGIN */
+#login-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 40%,#1a0a0f 0%,var(--bg) 70%);}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:40px;}
+.login-logo .delta-mark{width:48px;height:48px;background:var(--accent);clip-path:polygon(50% 0%,0% 100%,100% 100%);}
+.login-logo h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;}
+.login-logo span{color:var(--accent);}
+.login-cards{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:36px 40px;width:300px;text-align:center;cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s;}
+.login-card:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 8px 32px rgba(227,24,55,.2);}
+.login-card .role-icon{font-size:48px;margin-bottom:16px;}
+.login-card h2{font-size:20px;font-weight:700;margin-bottom:6px;}
+.login-card p{color:var(--text2);font-size:13px;}
+
+/* PIN */
+.pin-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);}
+.pin-modal.active{display:flex;}
+.pin-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;width:340px;text-align:center;}
+.pin-box h3{font-size:18px;font-weight:700;margin-bottom:8px;}
+.pin-box p{color:var(--text2);font-size:13px;margin-bottom:24px;}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:24px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:background .15s;}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pin-key{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:18px;font-weight:600;cursor:pointer;transition:background .15s;color:var(--text);}
+.pin-key:hover{background:var(--border);}
+.pin-key.del{color:var(--accent2);font-size:14px;}
+.pin-error{color:var(--accent);font-size:13px;margin-top:12px;min-height:18px;}
+.pin-cancel{margin-top:16px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;text-decoration:underline;}
+
+/* ALERT POPUP */
+.alert-popup{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:900;backdrop-filter:blur(6px);}
+.alert-popup.active{display:flex;}
+.alert-popup-box{background:var(--bg2);border:2px solid var(--yellow);border-radius:16px;padding:36px 40px;width:min(460px,95vw);text-align:center;animation:popIn .25s ease;}
+@keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.alert-popup-box .alert-icon{font-size:52px;margin-bottom:12px;}
+.alert-popup-box h3{font-size:20px;font-weight:700;color:var(--yellow);margin-bottom:8px;}
+.alert-popup-box p{color:var(--text2);font-size:14px;margin-bottom:20px;line-height:1.5;}
+.alert-req-list{text-align:left;background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:20px;}
+.alert-req-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.alert-req-item:last-child{border-bottom:none;}
+.alert-req-prio{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-top:1px;white-space:nowrap;}
+.alert-req-body{flex:1;}
+.alert-req-station{font-weight:700;font-size:13px;}
+.alert-req-desc{font-size:11px;color:var(--text2);margin-top:2px;}
+
+/* APP SHELL */
+#app{display:none;min-height:100vh;flex-direction:column;}
+#app.active{display:flex;}
+.topbar{height:56px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;position:sticky;top:0;z-index:100;}
+.topbar .delta-mark-sm{width:28px;height:28px;background:var(--accent);clip-path:polygon(50% 0%,0% 100%,100% 100%);flex-shrink:0;}
+.topbar-title{font-weight:700;font-size:15px;letter-spacing:-.2px;}
+.topbar-role{margin-left:8px;background:rgba(227,24,55,.15);color:var(--accent);border:1px solid rgba(227,24,55,.3);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;}
+.topbar-spacer{flex:1;}
+select.styled{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;}
+select.styled:focus{outline:none;border-color:var(--accent);}
+.btn{border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);transition:all .15s;}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-primary:hover{background:#c41630;}
+.btn-ghost{background:transparent;color:var(--text2);}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);}
+.btn-warn{background:rgba(210,153,34,.2);border-color:var(--yellow);color:var(--yellow);}
+.btn-warn:hover{background:rgba(210,153,34,.35);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.notif-wrap{position:relative;}
+.notif-dot{display:none;position:absolute;top:-3px;right:-3px;width:8px;height:8px;background:var(--accent);border-radius:50%;border:2px solid var(--bg2);}
+.notif-dot.show{display:block;}
+.notif-count{display:none;position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;background:var(--accent);border-radius:10px;border:2px solid var(--bg2);font-size:9px;font-weight:700;color:#fff;align-items:center;justify-content:center;padding:0 3px;}
+.notif-count.show{display:flex;}
+
+/* TABS */
+.tab-bar{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;padding:0 24px;gap:4px;}
+.tab-btn{padding:12px 16px;font-size:13px;font-weight:600;cursor:pointer;background:none;border:none;color:var(--text2);border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px;display:flex;align-items:center;gap:6px;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn:hover:not(.active){color:var(--text);}
+.tab-badge{background:var(--accent);color:#fff;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:700;}
+
+/* STICKY REQUEST BAR — IE */
+.sticky-req-bar{background:rgba(210,153,34,.12);border-bottom:1px solid rgba(210,153,34,.35);padding:10px 24px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s;}
+.sticky-req-bar:hover{background:rgba(210,153,34,.2);}
+.sticky-req-bar .srb-icon{font-size:18px;}
+.sticky-req-bar .srb-text{flex:1;font-size:13px;color:var(--yellow);font-weight:600;}
+.sticky-req-bar .srb-sub{font-size:11px;color:var(--text2);font-weight:400;}
+.sticky-req-bar .srb-arrow{font-size:14px;color:var(--text2);}
+
+/* MAIN */
+.main{flex:1;padding:24px;overflow-y:auto;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:24px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.stat-card .label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
+.stat-card .value{font-size:24px;font-weight:700;line-height:1;}
+.stat-card .unit{font-size:12px;color:var(--text2);margin-left:3px;}
+.stat-card.good .value{color:var(--green);}
+.stat-card.warn .value{color:var(--yellow);}
+.stat-card.bad .value{color:var(--accent);}
+.stat-card.info .value{color:var(--blue);}
+.progress-bar{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:3px;}
+
+/* CHART */
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:24px;}
+.chart-card h3{font-size:14px;font-weight:700;margin-bottom:4px;}
+.chart-subtitle{font-size:12px;color:var(--text2);margin-bottom:16px;}
+.chart-wrap{position:relative;width:100%;height:380px;}
+.legend-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+
+/* GENERAL TABLE */
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:24px;}
+.table-card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.table-card-header h3{font-size:14px;font-weight:700;flex:1;}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+.tbl td{padding:10px 12px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.025);}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+.badge-green{background:rgba(63,185,80,.15);color:var(--green);}
+.badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow);}
+.badge-red{background:rgba(227,24,55,.15);color:var(--accent);}
+.badge-blue{background:rgba(56,139,253,.15);color:var(--blue);}
+.badge-gray{background:rgba(110,118,129,.15);color:var(--text2);}
+td.row-no{color:var(--text2);text-align:center;font-size:11px;}
+
+/* IE TOOLBAR & FORM */
+.ie-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.ie-toolbar h2{font-size:16px;font-weight:700;flex:1;}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:20px;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-group label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+.form-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;transition:border-color .15s;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+textarea.form-input{resize:vertical;min-height:80px;font-family:inherit;}
+
+/* ── KEYBOARD-FIRST OBSERVATION TABLE ── */
+.obs-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;}
+.obs-tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:1100px;}
+
+/* group header rows */
+.obs-tbl thead tr.obs-head-group th{background:var(--bg);border:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:7px 6px;text-align:center;white-space:nowrap;}
+.obs-tbl thead tr.obs-head-group th.gh-cycle{background:rgba(56,139,253,.12);color:var(--blue);}
+.obs-tbl thead tr.obs-head-group th.gh-stats{background:rgba(63,185,80,.1);color:var(--green);}
+.obs-tbl thead tr.obs-head-group th.gh-va{background:rgba(165,160,255,.1);color:var(--purple);}
+
+/* body cells */
+.obs-tbl td{border:1px solid var(--border);padding:0;vertical-align:middle;height:42px;}
+.obs-tbl td.no-cell{background:var(--bg3);color:var(--text3);text-align:center;font-size:11px;width:36px;user-select:none;}
+.obs-tbl td.calc-cell{background:rgba(56,139,253,.07);color:var(--blue);font-weight:700;text-align:center;padding:0 6px;white-space:nowrap;}
+.obs-tbl td.calc-cell.over-oi{color:var(--accent);}
+.obs-tbl td.calc-cell.bottleneck{color:var(--yellow);}
+.obs-tbl td.pct-cell{text-align:center;padding:0 4px;}
+.obs-tbl td.del-cell{text-align:center;width:36px;background:var(--bg);}
+.obs-tbl tr.bottleneck-row td{background:rgba(227,24,55,.04);}
+.obs-tbl tr.bottleneck-row td.no-cell{background:rgba(227,24,55,.12);}
+
+/* editable cell inputs */
+.obs-tbl td .cell-in{
+  display:block;width:100%;height:100%;min-height:42px;
+  background:transparent;border:none;color:var(--text);
+  font-size:12px;font-family:inherit;padding:0 7px;text-align:center;
+  transition:background .1s;
+}
+.obs-tbl td .cell-in:focus{
+  outline:none;background:rgba(227,24,55,.08);
+  box-shadow:inset 0 0 0 2px var(--accent);
+}
+.obs-tbl td .cell-in.wide{text-align:left;padding:0 9px;}
+.obs-tbl td .cell-in::placeholder{color:var(--text3);}
+
+/* cycle time cells highlight */
+.obs-tbl td.cycle-cell{background:rgba(56,139,253,.03);}
+.obs-tbl td.cycle-cell .cell-in:focus{background:rgba(56,139,253,.12);box-shadow:inset 0 0 0 2px var(--blue);}
+
+/* VA toggles inline */
+.va-inline{display:flex;flex-wrap:wrap;gap:3px;padding:4px 6px;align-items:center;min-width:180px;}
+.va-chip{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:transparent;transition:all .12s;white-space:nowrap;user-select:none;}
+.va-chip:hover{border-color:var(--text2);color:var(--text);}
+.va-chip.sel-NVA{background:var(--nva);border-color:var(--nva);color:#fff;}
+.va-chip.sel-Manpower{background:var(--manpower);border-color:var(--manpower);color:#fff;}
+.va-chip.sel-Machine{background:var(--machine);border-color:var(--machine);color:#fff;}
+.va-chip.sel-TestOnly{background:var(--testonly);border-color:var(--testonly);color:#fff;}
+.va-chip.sel-Visual{background:var(--visual);border-color:var(--visual);color:#fff;}
+.va-chip.sel-VisualTest{background:var(--visualtest);border-color:var(--visualtest);color:#fff;}
+.va-chip.sel-MPTest{background:var(--manpowertest);border-color:var(--manpowertest);color:#fff;}
+.va-chip.sel-MPMachine{background:var(--manpowermachine);border-color:var(--manpowermachine);color:#fff;}
+
+/* add-row */
+.add-row-btn{width:100%;background:transparent;border:none;border-top:1px dashed var(--border);color:var(--text2);font-size:12px;font-weight:600;padding:10px;cursor:pointer;transition:all .15s;text-align:center;}
+.add-row-btn:hover{background:rgba(255,255,255,.03);color:var(--text);}
+.del-row-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:4px 8px;border-radius:4px;transition:all .12s;}
+.del-row-btn:hover{color:var(--accent);background:rgba(227,24,55,.1);}
+
+/* keyboard hint bar */
+.kb-hint{display:flex;gap:16px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.kb-key{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);}
+.kb-key kbd{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;font-family:inherit;color:var(--text);}
+
+/* summary strip */
+.ie-summary-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;}
+.iss-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.iss-card .lbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.iss-card .val{font-size:20px;font-weight:700;}
+
+/* HISTORY */
+.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;}
+.history-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:border-color .15s,transform .15s;}
+.history-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.history-card-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.history-card-icon{font-size:28px;}
+.history-card-title{font-size:14px;font-weight:700;}
+.history-card-meta{font-size:11px;color:var(--text2);margin-top:2px;}
+.history-card-stats{display:flex;gap:14px;}
+.history-stat .val{font-size:18px;font-weight:700;}
+.history-stat .lbl2{font-size:10px;color:var(--text2);}
+
+/* REQUEST CARDS */
+.req-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
+.req-card.pending{border-left:3px solid var(--yellow);}
+.req-card.resolved{border-left:3px solid var(--green);opacity:.7;}
+.req-card-body{flex:1;}
+.req-card-title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.req-card-meta{font-size:11px;color:var(--text2);}
+.req-card-desc{font-size:12px;color:var(--text);margin-top:6px;line-height:1.4;}
+
+/* MODAL */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(4px);}
+.modal.active{display:flex;}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px;width:min(600px,95vw);max-height:90vh;overflow-y:auto;}
+.modal-box h3{font-size:17px;font-weight:700;margin-bottom:6px;}
+.modal-box .modal-sub{color:var(--text2);font-size:13px;margin-bottom:20px;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2);}
+.empty-state .icon{font-size:48px;margin-bottom:12px;}
+.empty-state h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.empty-state p{font-size:13px;}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+@media(max-width:768px){.main{padding:14px;}.stats-row{grid-template-columns:repeat(2,1fr);}.login-cards{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-logo">
+    <div class="delta-mark"></div>
+    <h1>Delta <span>Electronics</span></h1>
+  </div>
+  <p style="color:var(--text2);font-size:13px;margin-bottom:32px;text-align:center;">Line Balance Management System · DSM Machine Management</p>
+  <div class="login-cards">
+    <div class="login-card" onclick="openPin('pit')">
+      <div class="role-icon">📊</div>
+      <h2>PIT Engineer</h2>
+      <p>View line balance charts, monitor KPIs, and send data correction requests to IE.</p>
+    </div>
+    <div class="login-card" onclick="openPin('ie')">
+      <div class="role-icon">⚙️</div>
+      <h2>IE Engineer</h2>
+      <p>Enter time observation data, manage production lines, and respond to PIT requests.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PIN MODAL -->
+<div class="pin-modal" id="pin-modal">
+  <div class="pin-box">
+    <h3 id="pin-title">Enter PIN</h3>
+    <p id="pin-subtitle">Access your role dashboard</p>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+      <div class="pin-dot" id="d4"></div><div class="pin-dot" id="d5"></div>
+    </div>
+    <div class="pin-keypad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" style="visibility:hidden"></button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <button class="pin-cancel" onclick="closePin()">Cancel</button>
+  </div>
+</div>
+
+<!-- IE REQUEST ALERT POPUP -->
+<div class="alert-popup" id="alert-popup">
+  <div class="alert-popup-box">
+    <div class="alert-icon">🔔</div>
+    <h3 id="ap-title">New Edit Requests from PIT</h3>
+    <p id="ap-desc">PIT engineers have flagged the following issues for your review:</p>
+    <div class="alert-req-list" id="ap-list"></div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-ghost" onclick="closeAlertPopup(false)">Review Later</button>
+      <button class="btn btn-warn" onclick="closeAlertPopup(true)">Go to Requests →</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app">
+  <div class="topbar">
+    <div class="delta-mark-sm"></div>
+    <div class="topbar-title">Line Balance System</div>
+    <span class="topbar-role" id="topbar-role">PIT</span>
+    <div class="topbar-spacer"></div>
+    <select class="styled" id="line-selector" onchange="onLineChange()">
+      <option value="">— Select Line —</option>
+    </select>
+    <div class="notif-wrap" id="notif-wrap">
+      <button class="btn btn-ghost btn-sm" id="notif-btn" onclick="switchTab('requests')" title="Pending requests" style="font-size:16px;padding:5px 9px;">🔔</button>
+      <div class="notif-count" id="notif-count"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+  <!-- Sticky request bar (IE only) -->
+  <div class="sticky-req-bar" id="sticky-req-bar" style="display:none;" onclick="switchTab('requests')">
+    <div class="srb-icon">⚠️</div>
+    <div class="srb-text">Pending PIT Requests <span class="srb-sub" id="srb-sub"></span></div>
+    <div class="srb-arrow">→ Review</div>
+  </div>
+  <div class="tab-bar" id="tab-bar"></div>
+  <div class="main" id="main-content"></div>
+</div>
+
+<!-- ADD LINE MODAL -->
+<div class="modal" id="modal-add-line">
+  <div class="modal-box">
+    <h3>➕ Add Production Line</h3>
+    <p class="modal-sub">Enter the details for the new line. You can edit these later.</p>
+    <div class="form-row">
+      <div class="form-group"><label>Line Name</label><input class="form-input" id="nl-name" placeholder="e.g. CD7"/></div>
+      <div class="form-group"><label>Model</label><input class="form-input" id="nl-model" placeholder="e.g. ECD16020111"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>OI Cycle Time (sec)</label><input class="form-input" type="number" id="nl-oi" placeholder="120"/></div>
+      <div class="form-group"><label>Manpower</label><input class="form-input" type="number" id="nl-mp" placeholder="16"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>DSM Machines</label><input class="form-input" type="number" id="nl-dsm" placeholder="7"/></div>
+      <div class="form-group"><label>Output/Day (pcs)</label><input class="form-input" type="number" id="nl-opd" placeholder="533"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-line')">Cancel</button>
+      <button class="btn btn-primary" onclick="addLine()">Add Line</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT REQUEST MODAL -->
+<div class="modal" id="modal-edit-request">
+  <div class="modal-box">
+    <h3>📝 Send Edit Request to IE</h3>
+    <p class="modal-sub">Describe what looks unusual. IE will be alerted immediately.</p>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Station / Area</label>
+      <input class="form-input" id="req-station" placeholder="e.g. Station 5 — HI-03"/>
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>What did you notice?</label>
+      <textarea class="form-input" id="req-desc" placeholder="Describe what looks wrong or unusual in the chart..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Priority</label>
+      <select class="form-input" id="req-priority">
+        <option value="Low">🟢 Low — minor discrepancy</option>
+        <option value="Medium" selected>🟡 Medium — needs review</option>
+        <option value="High">🔴 High — production impact</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-request')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRequest()">Send to IE</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY DETAIL MODAL -->
+<div class="modal" id="modal-history-detail">
+  <div class="modal-box" style="max-width:720px;width:min(720px,95vw)">
+    <h3 id="hist-modal-title">Snapshot Detail</h3>
+    <p class="modal-sub" id="hist-modal-meta"></p>
+    <div id="hist-modal-body"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-history-detail')">Close</button></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// CONSTANTS & STATE
+// ════════════════════════════════════════════
+const PINS = {pit:'111111',ie:'222222'};
+const VA_CATS = ['NVA','Manpower','Machine','Test Only','Visual Inspection','Visual+Test','MP+Test','MP+Machine'];
+const VA_KEY  = ['NVA','Manpower','Machine','TestOnly','Visual','VisualTest','MPTest','MPMachine'];
+
+let currentRole=null, pinRole=null, pinBuffer='', currentLine=null, currentTab='dashboard';
+
+// Seeded demo DB
+const DB = { lines:{}, requests:[] };
+
+function seedDB(){
+  const stationDefs=[
+    {name:'Router DSM',proc:'Cut PvB',mp:1,semiAuto:1,test:0,machine:0,cats:['Manpower']},
+    {name:'HI-01',proc:'HI point',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'DSM AI',proc:'',mp:0,semiAuto:0,test:0,machine:1,cats:['Machine']},
+    {name:'DSM Auto glue',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Manpower']},
+    {name:'HI-02',proc:'HI T point',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'HI-03',proc:'HI T point',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'HI-04',proc:"Man'l + Inspection",mp:1,semiAuto:0,test:0,machine:0,cats:['Visual Inspection']},
+    {name:'Wave solder',proc:'',mp:0,semiAuto:0,test:0,machine:1,cats:['Machine']},
+    {name:'Buffer stocker',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['NVA']},
+    {name:'PCB Loader',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'Solder AOI',proc:'',mp:0,semiAuto:0,test:1,machine:0,cats:['Test Only']},
+    {name:'TU-01',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'Auto insert A',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'Auto insert B',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'Autoflow 1',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'Auto solder',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'Auto AOI',proc:'',mp:0,semiAuto:0,test:1,machine:0,cats:['Test Only']},
+    {name:'Manual cmp',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'CRD-01',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'CRD-02',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'Assy thal A',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Visual Inspection']},
+    {name:'Assy thal B',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'Cu1',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']},
+    {name:'BI Auto A',proc:'',mp:0,semiAuto:0,test:1,machine:1,cats:['Machine','Test Only']},
+    {name:'ATS1',proc:'',mp:0,semiAuto:0,test:1,machine:0,cats:['Test Only']},
+    {name:'Autoflow 2',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'ATS2',proc:'',mp:0,semiAuto:0,test:1,machine:0,cats:['Test Only']},
+    {name:'EER',proc:'',mp:0,semiAuto:0,test:1,machine:0,cats:['Test Only']},
+    {name:'BI Auto B',proc:'',mp:0,semiAuto:0,test:1,machine:1,cats:['Machine']},
+    {name:'FL auto',proc:'',mp:0,semiAuto:1,test:0,machine:0,cats:['Machine']},
+    {name:'Packing',proc:'',mp:1,semiAuto:0,test:0,machine:0,cats:['Manpower']}
+  ];
+  ['CD7','CD8'].forEach((lname,li)=>{
+    const oi=li===0?120:110, mp=li===0?16:14, model=li===0?'ECD16020111':'ECD18030222';
+    const sessions=[];
+    const dates=['2026-06-17','2026-06-10','2026-06-03'];
+    dates.forEach((date,di)=>{
+      const rows=stationDefs.map((s,i)=>{
+        const base=35+((i*(li+1)*7+13+di*3)%85);
+        const cycles=[0,1,2,3,4].map(ci=>Math.max(10,Math.round(base+((i*(ci+1)*3+7)%24)-12)));
+        const vals=cycles.filter(x=>x>0);
+        return{...s,cycles,max:Math.max(...vals),min:Math.min(...vals),avg:Math.round(vals.reduce((a,b)=>a+b,0)/vals.length),pcsCycle:2+((i*3)%3)};
+      });
+      sessions.push({date,rows,oiCycle:oi,manpower:mp});
+    });
+    DB.lines[lname]={name:lname,model,oiCycle:oi,manpower:mp,dsm:li===0?7:6,outputPerDay:li===0?533:480,sessions};
+  });
+}
+seedDB();
+
+// ════════════════════════════════════════════
+// PIN
+// ════════════════════════════════════════════
+function openPin(role){
+  pinRole=role; pinBuffer='';
+  document.getElementById('pin-title').textContent=role==='pit'?'📊 PIT Engineer Access':'⚙️ IE Engineer Access';
+  document.getElementById('pin-subtitle').textContent='Enter your 6-digit PIN';
+  document.getElementById('pin-error').textContent='';
+  updatePinDots();
+  document.getElementById('pin-modal').classList.add('active');
+}
+function closePin(){document.getElementById('pin-modal').classList.remove('active');pinBuffer='';updatePinDots();}
+function pinKey(k){if(pinBuffer.length>=6)return;pinBuffer+=k;updatePinDots();if(pinBuffer.length===6)setTimeout(checkPin,150);}
+function pinDel(){pinBuffer=pinBuffer.slice(0,-1);updatePinDots();}
+function updatePinDots(){for(let i=0;i<6;i++)document.getElementById('d'+i).classList.toggle('filled',i<pinBuffer.length);}
+function checkPin(){
+  if(pinBuffer===PINS[pinRole]){closePin();launchApp(pinRole);}
+  else{
+    document.getElementById('pin-error').textContent='Incorrect PIN. Please try again.';
+    pinBuffer='';updatePinDots();
+    const b=document.querySelector('.pin-box');b.style.animation='none';b.offsetHeight;b.style.animation='shake .3s ease';
+  }
+}
+
+// ════════════════════════════════════════════
+// APP LAUNCH
+// ════════════════════════════════════════════
+function launchApp(role){
+  currentRole=role;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').classList.add('active');
+  document.getElementById('topbar-role').textContent=role==='pit'?'PIT Engineer':'IE Engineer';
+
+  // Line selector
+  const sel=document.getElementById('line-selector');
+  sel.innerHTML='<option value="">— Select Line —</option>';
+  Object.keys(DB.lines).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
+
+  currentTab=role==='pit'?'dashboard':'observation';
+  buildTabs(role);
+  updateNotif();
+
+  if(Object.keys(DB.lines).length){currentLine=Object.keys(DB.lines)[0];sel.value=currentLine;}
+
+  renderTab();
+
+  // IE: show alert popup if there are pending requests
+  if(role==='ie'){
+    const pending=DB.requests.filter(r=>r.status==='Pending');
+    if(pending.length) showAlertPopup(pending);
+  }
+}
+
+function logout(){
+  currentRole=null;currentLine=null;ieRows=[];
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('login-screen').style.display='flex';
+}
+
+function buildTabs(role){
+  const bar=document.getElementById('tab-bar');
+  const tabs=role==='pit'
+    ?[['dashboard','📊 Dashboard'],['history','🕒 History'],['requests','📋 Requests']]
+    :[['observation','📝 Observation'],['history','🕒 History'],['requests','🔔 Requests']];
+  bar.innerHTML=tabs.map(([id,label])=>`
+    <button class="tab-btn ${id===currentTab?'active':''}" id="tab-${id}" onclick="switchTab('${id}')">
+      ${label}${id==='requests'?'<span class="tab-badge" id="tab-badge" style="display:none"></span>':''}
+    </button>`).join('');
+  updateNotif();
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('tab-'+tab);
+  if(btn)btn.classList.add('active');
+  renderTab();
+}
+
+function onLineChange(){currentLine=document.getElementById('line-selector').value||null;ieRows=[];renderTab();}
+
+function updateNotif(){
+  const pending=DB.requests.filter(r=>r.status==='Pending');
+  const cnt=pending.length;
+  // top bar count
+  const nc=document.getElementById('notif-count');
+  if(nc){nc.textContent=cnt>0?cnt:'';nc.classList.toggle('show',cnt>0);}
+  // tab badge
+  const tb=document.getElementById('tab-badge');
+  if(tb){tb.textContent=cnt>0?cnt:'';tb.style.display=cnt>0?'inline':'none';}
+  // sticky bar (IE only)
+  const srb=document.getElementById('sticky-req-bar');
+  if(srb){
+    if(currentRole==='ie'&&cnt>0){
+      srb.style.display='flex';
+      const sub=document.getElementById('srb-sub');
+      if(sub)sub.textContent=`— ${cnt} request${cnt>1?'s':''} waiting`;
+    } else {srb.style.display='none';}
+  }
+}
+
+// ════════════════════════════════════════════
+// ALERT POPUP (IE login)
+// ════════════════════════════════════════════
+function showAlertPopup(pending){
+  const list=document.getElementById('ap-list');
+  document.getElementById('ap-title').textContent=`${pending.length} Edit Request${pending.length>1?'s':''} from PIT`;
+  list.innerHTML=pending.slice(0,5).map(r=>`
+    <div class="alert-req-item">
+      <span class="alert-req-prio badge ${r.priority==='High'?'badge-red':r.priority==='Medium'?'badge-yellow':'badge-gray'}">${r.priority}</span>
+      <div class="alert-req-body">
+        <div class="alert-req-station">Line ${r.line} · ${r.station}</div>
+        <div class="alert-req-desc">${r.desc}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('alert-popup').classList.add('active');
+}
+function closeAlertPopup(goToRequests){
+  document.getElementById('alert-popup').classList.remove('active');
+  if(goToRequests)switchTab('requests');
+}
+
+// ════════════════════════════════════════════
+// PIT DASHBOARD
+// ════════════════════════════════════════════
+function renderPITDashboard(el){
+  if(!currentLine){el.innerHTML=`<div class="empty-state"><div class="icon">📊</div><h3>Select a Production Line</h3><p>Choose a line from the dropdown above.</p></div>`;return;}
+  const line=DB.lines[currentLine];
+  const session=line.sessions[0];
+  if(!session){el.innerHTML=`<div class="empty-state"><div class="icon">📭</div><h3>No data yet</h3><p>IE has not submitted time observation data for this line.</p></div>`;return;}
+  const rows=session.rows, oi=session.oiCycle;
+  const avgs=rows.map(r=>r.avg||calcAvg(r.cycles));
+  const bottleneck=Math.max(...avgs);
+  const lbe=+(avgs.reduce((a,b)=>a+b,0)/(avgs.length*bottleneck)*100).toFixed(2);
+  const lbl=+(100-lbe).toFixed(2);
+  const bnName=rows[avgs.indexOf(bottleneck)]?.name||'—';
+  const totalMp=rows.reduce((a,r)=>a+(r.mp||0),0);
+  const idealMp=Math.ceil(avgs.reduce((a,b)=>a+b,0)/oi);
+  const mpSuff=+(idealMp/totalMp*100).toFixed(1);
+  const myReqs=DB.requests.filter(r=>r.line===currentLine&&r.status==='Pending');
+
+  el.innerHTML=`
+    ${myReqs.length?`<div style="background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px;">⏳</span>
+      <div style="flex:1;font-size:13px;color:var(--yellow);font-weight:600;">You have ${myReqs.length} pending request${myReqs.length>1?'s':''} for IE on this line.</div>
+      <button class="btn btn-ghost btn-sm" onclick="switchTab('requests')">View →</button>
+    </div>`:''}
+    <div class="stats-row">
+      <div class="stat-card ${lbe>=75?'good':lbe>=60?'warn':'bad'}">
+        <div class="label">Line Balance Efficiency</div>
+        <div class="value">${lbe}<span class="unit">%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(lbe,100)}%;background:${lbe>=75?'var(--green)':lbe>=60?'var(--yellow)':'var(--accent)'}"></div></div>
+      </div>
+      <div class="stat-card bad"><div class="label">Line Balance Loss</div><div class="value">${lbl}<span class="unit">%</span></div></div>
+      <div class="stat-card info"><div class="label">OI Cycle Time</div><div class="value">${oi}<span class="unit">sec</span></div></div>
+      <div class="stat-card warn"><div class="label">Bottleneck</div><div class="value" style="font-size:17px;">${bnName}</div><div style="font-size:11px;color:var(--text2);margin-top:2px;">${bottleneck} sec</div></div>
+      <div class="stat-card ${mpSuff>=90?'good':mpSuff>=70?'warn':'bad'}"><div class="label">MP Sufficiency</div><div class="value">${mpSuff}<span class="unit">%</span></div></div>
+      <div class="stat-card good"><div class="label">Output / Day</div><div class="value">${line.outputPerDay}<span class="unit">pcs</span></div></div>
+    </div>
+    <div class="chart-card">
+      <h3>Line Balance Efficiency & Value Added Chart</h3>
+      <div class="chart-subtitle">Model: ${line.model} · Line: ${currentLine} · OI Cycle: ${oi} sec/pcs · ${session.date}</div>
+      <div class="chart-wrap"><canvas id="lb-chart"></canvas></div>
+      <div class="legend-row">
+        ${[['NVA','var(--nva)'],['Manpower','var(--manpower)'],['Machine','var(--machine)'],['Test Only','var(--testonly)'],['Visual Inspection','var(--visual)'],['Visual+Test','var(--visualtest)'],['MP+Test','var(--manpowertest)'],['MP+Machine','var(--manpowermachine)']].map(([l,c])=>`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div>${l}</div>`).join('')}
+        <div class="legend-item"><div style="width:20px;height:2px;background:var(--accent);margin-top:4px;"></div>&nbsp;OI Cycle Time</div>
+      </div>
+    </div>
+    <div style="margin-bottom:20px;">
+      <button class="btn btn-primary" onclick="openModal('modal-edit-request')">📝 Send Edit Request to IE</button>
+      <span style="font-size:12px;color:var(--text2);margin-left:10px;">Spotted an anomaly in the chart? Notify IE directly.</span>
+    </div>
+    <div class="table-card">
+      <div class="table-card-header"><h3>Station Summary</h3><span style="font-size:12px;color:var(--text2);">${rows.length} stations</span></div>
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Station</th><th>Process</th><th>AVG (sec)</th><th>MAX</th><th>MIN</th><th>vs OI</th><th>VA Category</th></tr></thead>
+        <tbody>${rows.map((r,i)=>{
+          const avg=r.avg||calcAvg(r.cycles),over=avg>oi,pct=avg?Math.round(avg/oi*100):0;
+          return`<tr><td class="row-no">${i+1}</td><td><strong>${r.name}</strong></td><td style="color:var(--text2);font-size:11px;">${r.proc||'—'}</td>
+          <td><strong style="color:${over?'var(--accent)':avg===bottleneck?'var(--yellow)':'var(--green)'}">${avg}</strong></td>
+          <td style="color:var(--text2)">${r.max}</td><td style="color:var(--text2)">${r.min}</td>
+          <td><span class="badge ${over?'badge-red':'badge-green'}">${pct}%</span></td>
+          <td>${(r.cats||[]).map(c=>`<span class="badge badge-blue" style="font-size:9px;margin-right:2px;">${c}</span>`).join('')}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  renderLBChart(rows,oi);
+}
+
+function renderLBChart(rows,oi){
+  const ctx=document.getElementById('lb-chart');
+  if(!ctx)return;
+  if(window._lbChart){window._lbChart.destroy();}
+  const catColors={'NVA':'#6e7681','Manpower':'#3fb950','Machine':'#388bfd','Test Only':'#d29922','Visual Inspection':'#a5a0ff','Visual+Test':'#ff9f40','MP+Test':'#39d0d8','MP+Machine':'#e31837'};
+  const catDatasets=Object.entries(catColors).map(([cat,col])=>({
+    label:cat,data:rows.map(r=>(r.cats||[]).includes(cat)?r.avg||calcAvg(r.cycles):0),
+    backgroundColor:col+'cc',borderColor:col,borderWidth:1,borderRadius:3,stack:'main',order:2,categoryPercentage:.7,barPercentage:.85
+  }));
+  window._lbChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:rows.map(r=>r.name),datasets:[...catDatasets,{
+      label:'OI Cycle Time',data:rows.map(()=>oi),type:'line',borderColor:'#e31837',borderWidth:2,
+      pointRadius:0,fill:false,tension:0,order:1,yAxisID:'y'
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2937',borderColor:'#30363d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e',callbacks:{label:c=>` ${c.dataset.label}: ${c.raw} sec`}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#8b949e',font:{size:9},maxRotation:45,minRotation:30},grid:{color:'rgba(48,54,61,.5)'}},
+        y:{stacked:true,ticks:{color:'#8b949e',font:{size:11}},grid:{color:'rgba(48,54,61,.5)'},title:{display:true,text:'Cycle Time (sec)',color:'#8b949e',font:{size:11}}}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+// IE OBSERVATION — KEYBOARD-FIRST
+// ════════════════════════════════════════════
+let ieRows=[];
+let ieMeta={date:new Date().toISOString().slice(0,10),model:'',oi:120,mp:16};
+
+// Column order for Tab navigation (matches td order in renderObsRow):
+// 0:station 1:proc 2:mp 3:semi 4:test 5:testCycle 6:pcsCycle 7:c0 8:c1 9:c2 10:c3 11:c4
+const TABCOLS=13; // 0..12 (0=station..11=c4, 12=VA – skipped for Enter-nav)
+
+function renderIEObservation(el){
+  const line=currentLine?DB.lines[currentLine]:null;
+  if(!currentLine){
+    el.innerHTML=`<div class="ie-toolbar"><h2>Time Observation Sheet</h2><button class="btn btn-primary" onclick="openModal('modal-add-line')">➕ Add Line</button></div>
+    <div class="empty-state"><div class="icon">⚙️</div><h3>Select or Add a Line</h3><p>Use the dropdown above or add a new production line.</p></div>`;return;
+  }
+  if(!ieRows.length){
+    const s=line.sessions[0];
+    if(s){ieRows=s.rows.map(r=>({...r,cycles:[...r.cycles]}));ieMeta={date:new Date().toISOString().slice(0,10),model:line.model,oi:line.oiCycle,mp:line.manpower};}
+    else{ieRows=[blankRow()];ieMeta={date:new Date().toISOString().slice(0,10),model:line.model,oi:line.oiCycle,mp:line.manpower};}
+  }
+  el.innerHTML=`
+    <div class="ie-toolbar">
+      <h2>Time Observation — ${currentLine}</h2>
+      <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-line')">➕ Add Line</button>
+      <button class="btn btn-primary" onclick="saveSession()">💾 Save Snapshot</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input class="form-input" type="date" id="ie-date" value="${ieMeta.date}" onchange="ieMeta.date=this.value"/></div>
+      <div class="form-group"><label>Model</label><input class="form-input" id="ie-model" value="${ieMeta.model}" onchange="ieMeta.model=this.value" placeholder="e.g. ECD16020111"/></div>
+      <div class="form-group"><label>OI Cycle Time (sec)</label><input class="form-input" type="number" id="ie-oi" value="${ieMeta.oi}" onchange="ieMeta.oi=+this.value;rerenderCalcs()"/></div>
+      <div class="form-group"><label>Manpower</label><input class="form-input" type="number" id="ie-mp" value="${ieMeta.mp}" onchange="ieMeta.mp=+this.value"/></div>
+    </div>
+    <div class="kb-hint">
+      <span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Keyboard shortcuts</span>
+      <span class="kb-key"><kbd>Tab</kbd> Next cell</span>
+      <span class="kb-key"><kbd>Shift+Tab</kbd> Previous cell</span>
+      <span class="kb-key"><kbd>Enter</kbd> Next row (same column)</span>
+      <span class="kb-key"><kbd>↑↓</kbd> Move rows</span>
+      <span class="kb-key"><kbd>Alt+N</kbd> Add row</span>
+    </div>
+    <div class="obs-wrap">
+      <table class="obs-tbl" id="obs-tbl">
+        <thead>
+          <tr class="obs-head-group">
+            <th rowspan="2">#</th>
+            <th rowspan="2">Station Name</th>
+            <th rowspan="2">Process Unit</th>
+            <th rowspan="2">MP</th>
+            <th rowspan="2">Semi<br>Auto</th>
+            <th rowspan="2">Test<br>Mach.</th>
+            <th rowspan="2">Test/<br>Cycle</th>
+            <th rowspan="2">Pcs/<br>Cycle</th>
+            <th colspan="5" class="gh-cycle">Cycle Time (sec) — enter up to 5 readings</th>
+            <th colspan="3" class="gh-stats">Cycle Time / Piece</th>
+            <th class="gh-va">VA Category</th>
+            <th rowspan="2">vs OI</th>
+            <th rowspan="2"></th>
+          </tr>
+          <tr class="obs-head-group">
+            <th class="gh-cycle">①</th><th class="gh-cycle">②</th><th class="gh-cycle">③</th><th class="gh-cycle">④</th><th class="gh-cycle">⑤</th>
+            <th class="gh-stats">MAX</th><th class="gh-stats">MIN</th><th class="gh-stats">AVG</th>
+            <th class="gh-va"></th>
+          </tr>
+        </thead>
+        <tbody id="obs-body">${buildObsRows()}</tbody>
+      </table>
+      <button class="add-row-btn" onclick="addObsRow()">＋ Add Station Row &nbsp;<span style="opacity:.5;font-size:11px;">(Alt+N)</span></button>
+    </div>
+    <div class="ie-summary-strip" id="ie-sum">${buildIESummary()}</div>`;
+
+  attachObsKeyboard();
+}
+
+function buildObsRows(){
+  const maxAvg=Math.max(0,...ieRows.map(r=>calcAvg(r.cycles)));
+  return ieRows.map((r,i)=>buildObsRow(r,i,maxAvg,ieMeta.oi)).join('');
+}
+
+function buildObsRow(r,i,maxAvg,oi){
+  const cycles=r.cycles||[0,0,0,0,0];
+  const avg=calcAvg(cycles), max=cycles.filter(x=>x>0).length?Math.max(...cycles.filter(x=>x>0)):0;
+  const min=cycles.filter(x=>x>0).length?Math.min(...cycles.filter(x=>x>0)):0;
+  const isBot=avg>0&&avg===maxAvg, overOi=avg>oi;
+  const pct=avg&&oi?Math.round(avg/oi*100):0;
+
+  // VA chips
+  const vaHtml=VA_CATS.map((cat,ci)=>{
+    const key=VA_KEY[ci];
+    const sel=(r.cats||[]).includes(cat);
+    return`<span class="va-chip${sel?' sel-'+key:''}" onclick="toggleVA(${i},'${cat}','${key}',this)">${cat}</span>`;
+  }).join('');
+
+  return`<tr class="${isBot?'bottleneck-row':''}" data-row="${i}" id="obs-row-${i}">
+    <td class="no-cell">${i+1}</td>
+    <td><input class="cell-in wide" data-r="${i}" data-c="0" value="${esc(r.name||'')}" placeholder="Station name" onchange="ieRows[${i}].name=this.value"/></td>
+    <td><input class="cell-in wide" data-r="${i}" data-c="1" value="${esc(r.proc||'')}" placeholder="Process" onchange="ieRows[${i}].proc=this.value"/></td>
+    <td><input class="cell-in" type="number" data-r="${i}" data-c="2" min="0" value="${r.mp||0}" onchange="ieRows[${i}].mp=+this.value||0"/></td>
+    <td><input class="cell-in" type="number" data-r="${i}" data-c="3" min="0" value="${r.semiAuto||0}" onchange="ieRows[${i}].semiAuto=+this.value||0"/></td>
+    <td><input class="cell-in" type="number" data-r="${i}" data-c="4" min="0" value="${r.test||0}" onchange="ieRows[${i}].test=+this.value||0"/></td>
+    <td><input class="cell-in" type="number" data-r="${i}" data-c="5" min="0" value="${r.testCycle||0}" onchange="ieRows[${i}].testCycle=+this.value||0"/></td>
+    <td><input class="cell-in" type="number" data-r="${i}" data-c="6" min="1" value="${r.pcsCycle||2}" onchange="ieRows[${i}].pcsCycle=+this.value||1;rerenderCalcs()"/></td>
+    ${[0,1,2,3,4].map(ci=>`<td class="cycle-cell"><input class="cell-in" type="number" data-r="${i}" data-c="${7+ci}" min="0" value="${cycles[ci]||''}" placeholder="—" onchange="ieRows[${i}].cycles[${ci}]=+this.value||0;rerenderCalcs()"/></td>`).join('')}
+    <td class="calc-cell">${max||'—'}</td>
+    <td class="calc-cell">${min||'—'}</td>
+    <td class="calc-cell ${overOi?'over-oi':isBot?'bottleneck':''}">${avg||'—'}</td>
+    <td><div class="va-inline">${vaHtml}</div></td>
+    <td class="pct-cell"><span class="badge ${overOi?'badge-red':'badge-green'}" style="font-size:9px">${avg?pct+'%':'—'}</span></td>
+    <td class="del-cell"><button class="del-row-btn" onclick="delObsRow(${i})" tabindex="-1">✕</button></td>
+  </tr>`;
+}
+
+function buildIESummary(){
+  const avgs=ieRows.map(r=>calcAvg(r.cycles)).filter(x=>x>0);
+  if(!avgs.length)return'';
+  const bn=Math.max(...avgs),lbe=+(avgs.reduce((a,b)=>a+b,0)/(avgs.length*bn)*100).toFixed(1),lbl=+(100-lbe).toFixed(1);
+  return`
+    <div class="iss-card"><div class="lbl">LBE</div><div class="val" style="color:${lbe>=75?'var(--green)':lbe>=60?'var(--yellow)':'var(--accent)'}">${lbe}%</div></div>
+    <div class="iss-card"><div class="lbl">LB Loss</div><div class="val" style="color:var(--accent)">${lbl}%</div></div>
+    <div class="iss-card"><div class="lbl">Bottleneck</div><div class="val" style="color:var(--yellow)">${bn} sec</div></div>
+    <div class="iss-card"><div class="lbl">Stations</div><div class="val" style="color:var(--blue)">${ieRows.length}</div></div>
+    <div class="iss-card"><div class="lbl">OI Cycle</div><div class="val" style="color:var(--text2)">${ieMeta.oi} sec</div></div>`;
+}
+
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function calcAvg(cycles){const v=(cycles||[]).filter(x=>x>0);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;}
+function blankRow(){return{name:'',proc:'',mp:0,semiAuto:0,test:0,testCycle:0,pcsCycle:2,cycles:[0,0,0,0,0],cats:[]};}
+
+function rerenderCalcs(){
+  const tbody=document.getElementById('obs-body');
+  if(!tbody)return;
+  const maxAvg=Math.max(0,...ieRows.map(r=>calcAvg(r.cycles)));
+  tbody.innerHTML=ieRows.map((r,i)=>buildObsRow(r,i,maxAvg,ieMeta.oi)).join('');
+  const sum=document.getElementById('ie-sum');
+  if(sum)sum.innerHTML=buildIESummary();
+  attachObsKeyboard();
+}
+
+function toggleVA(i,cat,key,el){
+  if(!ieRows[i].cats)ieRows[i].cats=[];
+  const idx=ieRows[i].cats.indexOf(cat);
+  if(idx>-1){ieRows[i].cats.splice(idx,1);el.classList.remove('sel-'+key);}
+  else{ieRows[i].cats.push(cat);el.classList.add('sel-'+key);}
+}
+
+function addObsRow(){
+  ieRows.push(blankRow());
+  rerenderCalcs();
+  // focus first cell of new row
+  setTimeout(()=>{const inp=document.querySelector(`[data-r="${ieRows.length-1}"][data-c="0"]`);if(inp)inp.focus();},50);
+}
+
+function delObsRow(i){
+  if(ieRows.length<=1){alert('At least one station row is required.');return;}
+  ieRows.splice(i,1);rerenderCalcs();
+}
+
+function saveSession(){
+  if(!currentLine)return;
+  const line=DB.lines[currentLine];
+  const session={
+    date:ieMeta.date||new Date().toISOString().slice(0,10),
+    oiCycle:ieMeta.oi,manpower:ieMeta.mp,
+    rows:ieRows.map(r=>({...r,cycles:[...r.cycles],max:Math.max(0,...r.cycles.filter(x=>x>0)),min:r.cycles.filter(x=>x>0).length?Math.min(...r.cycles.filter(x=>x>0)):0,avg:calcAvg(r.cycles)}))
+  };
+  line.sessions.unshift(session);
+  if(line.sessions.length>10)line.sessions.splice(10);
+  ieRows=[];
+  alert(`✅ Snapshot saved for ${currentLine} (${session.date})`);
+  renderTab();
+}
+
+// ── Keyboard navigation ──
+function attachObsKeyboard(){
+  const tbl=document.getElementById('obs-tbl');
+  if(!tbl)return;
+  tbl.querySelectorAll('.cell-in').forEach(inp=>{
+    inp.addEventListener('keydown',e=>{
+      const r=+inp.dataset.r, c=+inp.dataset.c;
+      if(e.key==='Enter'&&!e.shiftKey){
+        e.preventDefault();
+        // move to same column, next row; if last row, add one
+        if(r>=ieRows.length-1){addObsRow();return;}
+        focusCell(r+1,c);
+      } else if(e.key==='ArrowDown'&&e.altKey){
+        e.preventDefault();focusCell(r+1,c);
+      } else if(e.key==='ArrowUp'&&(e.altKey||e.ctrlKey)){
+        e.preventDefault();focusCell(r-1,c);
+      } else if(e.key==='n'&&e.altKey){
+        e.preventDefault();addObsRow();
+      }
+    });
+  });
+  // Global Alt+N
+  document.onkeydown=e=>{if(e.key==='n'&&e.altKey&&currentTab==='observation'){e.preventDefault();addObsRow();}};
+}
+
+function focusCell(row,col){
+  if(row<0||row>=ieRows.length)return;
+  const inp=document.querySelector(`[data-r="${row}"][data-c="${col}"]`);
+  if(inp){inp.focus();if(inp.select)inp.select();}
+}
+
+// ════════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════════
+function renderHistory(el){
+  const linesToShow=currentLine?[currentLine]:Object.keys(DB.lines);
+  let html=`<div class="ie-toolbar"><h2>Line Balance History</h2></div>`;
+  if(!linesToShow.length){el.innerHTML=html+`<div class="empty-state"><div class="icon">🕒</div><h3>No lines yet</h3><p>Add a production line to see history.</p></div>`;return;}
+  linesToShow.forEach(ln=>{
+    const line=DB.lines[ln];if(!line)return;
+    html+=`<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">📋 ${ln} — ${line.model}</div>`;
+    if(!line.sessions.length){html+=`<p style="color:var(--text2);font-size:13px;margin-bottom:20px;">No snapshots yet.</p>`;return;}
+    html+=`<div class="history-grid" style="margin-bottom:28px;">`;
+    line.sessions.forEach((s,idx)=>{
+      const avgs=s.rows.map(r=>r.avg||calcAvg(r.cycles)).filter(x=>x>0);
+      const bn=avgs.length?Math.max(...avgs):0;
+      const lbe=avgs.length?+(avgs.reduce((a,b)=>a+b,0)/(avgs.length*bn)*100).toFixed(1):0;
+      html+=`<div class="history-card" onclick="showHistoryDetail('${ln}',${idx})">
+        <div class="history-card-header">
+          <div class="history-card-icon">📊</div>
+          <div><div class="history-card-title">Snapshot ${idx+1} · ${s.date}</div>
+          <div class="history-card-meta">${s.rows.length} stations · OI: ${s.oiCycle} sec · MP: ${s.manpower}</div></div>
+        </div>
+        <div class="history-card-stats">
+          <div class="history-stat"><div class="val" style="color:${lbe>=75?'var(--green)':lbe>=60?'var(--yellow)':'var(--accent)'}">${lbe}%</div><div class="lbl2">LBE</div></div>
+          <div class="history-stat"><div class="val" style="color:var(--yellow)">${bn}</div><div class="lbl2">Bottleneck</div></div>
+          <div class="history-stat"><div class="val" style="color:var(--blue)">${s.oiCycle}</div><div class="lbl2">OI Cycle</div></div>
+        </div></div>`;
+    });
+    html+=`</div>`;
+  });
+  el.innerHTML=html;
+}
+
+function showHistoryDetail(ln,idx){
+  const line=DB.lines[ln], s=line.sessions[idx];
+  const avgs=s.rows.map(r=>r.avg||calcAvg(r.cycles)).filter(x=>x>0);
+  const bn=avgs.length?Math.max(...avgs):0;
+  const lbe=avgs.length?+(avgs.reduce((a,b)=>a+b,0)/(avgs.length*bn)*100).toFixed(2):0;
+  document.getElementById('hist-modal-title').textContent=`${ln} · ${s.date}`;
+  document.getElementById('hist-modal-meta').textContent=`Model: ${line.model} · ${s.rows.length} stations · OI: ${s.oiCycle} sec · LBE: ${lbe}%`;
+  document.getElementById('hist-modal-body').innerHTML=`<table class="tbl">
+    <thead><tr><th>#</th><th>Station</th><th>AVG (sec)</th><th>MAX</th><th>MIN</th><th>VA</th><th>vs OI</th></tr></thead>
+    <tbody>${s.rows.map((r,i)=>{const avg=r.avg||calcAvg(r.cycles),over=avg>s.oiCycle;return`<tr>
+      <td class="row-no">${i+1}</td><td>${r.name}</td>
+      <td style="color:${over?'var(--accent)':'var(--green)'}"><strong>${avg}</strong></td>
+      <td style="color:var(--text2)">${r.max}</td><td style="color:var(--text2)">${r.min}</td>
+      <td>${(r.cats||[]).map(c=>`<span class="badge badge-blue" style="font-size:9px">${c}</span>`).join(' ')}</td>
+      <td><span class="badge ${over?'badge-red':'badge-green'}">${avg?Math.round(avg/s.oiCycle*100)+'%':'—'}</span></td>
+    </tr>`;}).join('')}</tbody></table>`;
+  openModal('modal-history-detail');
+}
+
+// ════════════════════════════════════════════
+// REQUESTS
+// ════════════════════════════════════════════
+function renderPITRequests(el){
+  const mine=DB.requests.filter(r=>r.role==='pit');
+  el.innerHTML=`<div class="ie-toolbar"><h2>My Edit Requests</h2><button class="btn btn-primary" onclick="openModal('modal-edit-request')">📝 New Request</button></div>
+  ${!mine.length?`<div class="empty-state"><div class="icon">📋</div><h3>No requests sent yet</h3><p>If you spot unusual data in the charts, use "Send Edit Request to IE" to flag it.</p></div>`
+  :mine.map(r=>`<div class="req-card ${r.status.toLowerCase()}">
+    <div>
+      <span class="badge ${r.priority==='High'?'badge-red':r.priority==='Medium'?'badge-yellow':'badge-gray'}" style="margin-bottom:6px;">${r.priority}</span>
+      <span class="badge ${r.status==='Resolved'?'badge-green':'badge-yellow'}" style="margin-left:4px;">${r.status}</span>
+    </div>
+    <div class="req-card-body">
+      <div class="req-card-title">Line ${r.line} · ${r.station}</div>
+      <div class="req-card-meta">${r.date}</div>
+      <div class="req-card-desc">${r.desc}</div>
+    </div>
+  </div>`).join('')}`;
+}
+
+function renderIERequests(el){
+  updateNotif();
+  const all=DB.requests;
+  el.innerHTML=`<div class="ie-toolbar"><h2>Edit Requests from PIT</h2></div>
+  ${!all.length?`<div class="empty-state"><div class="icon">🔔</div><h3>No requests yet</h3><p>PIT will send requests here when they notice data issues.</p></div>`
+  :all.map((r,i)=>`<div class="req-card ${r.status.toLowerCase()}">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:90px;">
+      <span class="badge ${r.priority==='High'?'badge-red':r.priority==='Medium'?'badge-yellow':'badge-gray'}">${r.priority}</span>
+      <span class="badge ${r.status==='Resolved'?'badge-green':'badge-yellow'}">${r.status}</span>
+      ${r.status==='Pending'?`<button class="btn btn-primary btn-sm" onclick="resolveRequest(${i})">✓ Resolve</button>`:''}
+    </div>
+    <div class="req-card-body">
+      <div class="req-card-title">Line ${r.line} · ${r.station}</div>
+      <div class="req-card-meta">${r.date}</div>
+      <div class="req-card-desc">${r.desc}</div>
+    </div>
+  </div>`).join('')}`;
+}
+
+function resolveRequest(i){DB.requests[i].status='Resolved';updateNotif();renderTab();}
+
+function submitRequest(){
+  const station=document.getElementById('req-station').value.trim();
+  const desc=document.getElementById('req-desc').value.trim();
+  const priority=document.getElementById('req-priority').value;
+  if(!station||!desc){alert('Please fill in both the Station and Description fields.');return;}
+  DB.requests.unshift({role:'pit',line:currentLine||'—',station,desc,priority,status:'Pending',date:new Date().toISOString().slice(0,10)});
+  closeModal('modal-edit-request');
+  document.getElementById('req-station').value='';document.getElementById('req-desc').value='';
+  updateNotif();
+  // Show confirmation
+  const toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:24px;right:24px;background:#1f2937;border:1px solid #3fb950;color:#3fb950;border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);';
+  toast.textContent='✅ Request sent to IE';document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(),3000);
+  renderTab();
+}
+
+// ════════════════════════════════════════════
+// ADD LINE
+// ════════════════════════════════════════════
+function addLine(){
+  const name=document.getElementById('nl-name').value.trim();
+  const model=document.getElementById('nl-model').value.trim();
+  const oi=+document.getElementById('nl-oi').value||120;
+  const mp=+document.getElementById('nl-mp').value||16;
+  const dsm=+document.getElementById('nl-dsm').value||0;
+  const opd=+document.getElementById('nl-opd').value||0;
+  if(!name){alert('Line name is required.');return;}
+  if(DB.lines[name]){alert(`Line "${name}" already exists.`);return;}
+  DB.lines[name]={name,model,oiCycle:oi,manpower:mp,dsm,outputPerDay:opd,sessions:[]};
+  const sel=document.getElementById('line-selector');
+  const o=document.createElement('option');o.value=name;o.textContent=name;sel.appendChild(o);
+  closeModal('modal-add-line');
+  currentLine=name;sel.value=name;ieRows=[];
+  renderTab();
+}
+
+// ════════════════════════════════════════════
+// MODAL HELPERS
+// ════════════════════════════════════════════
+function openModal(id){document.getElementById(id).classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+document.addEventListener('click',e=>{
+  ['modal-add-line','modal-edit-request','modal-history-detail'].forEach(id=>{
+    const m=document.getElementById(id);if(m&&e.target===m)closeModal(id);
+  });
+});
+
+// ════════════════════════════════════════════
+// RENDER ROUTER
+// ════════════════════════════════════════════
+function renderTab(){
+  const el=document.getElementById('main-content');
+  if(currentRole==='pit'){
+    if(currentTab==='dashboard')renderPITDashboard(el);
+    else if(currentTab==='history')renderHistory(el);
+    else if(currentTab==='requests')renderPITRequests(el);
+  } else {
+    if(currentTab==='observation')renderIEObservation(el);
+    else if(currentTab==='history')renderHistory(el);
+    else if(currentTab==='requests')renderIERequests(el);
+  }
+}
+</script>
+</body>
+</html>
