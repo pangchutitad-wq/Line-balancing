@@ -142,7 +142,7 @@ select.styled:focus{outline:none;border-color:var(--accent);}
 .chart-card{background:var(--bg2);border:1px solid #b8cfe8;border-radius:var(--radius);padding:18px;margin-bottom:18px;}
 .chart-card h3{font-size:13px;font-weight:700;margin-bottom:3px;}
 .chart-sub{font-size:11px;color:var(--text2);margin-bottom:14px;}
-.chart-wrap{position:relative;width:100%;height:360px;}
+.chart-wrap{position:relative;width:100%;height:420px;}
 .legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);}
 .legend-dot{width:12px;height:10px;border-radius:2px;flex-shrink:0;}
@@ -729,69 +729,167 @@ function renderDashboard(el,isIE){
 function renderLBChart(rows, oi) {
   const canvas = document.getElementById('lb-chart');
   if (!canvas) return;
-  drawLBChart(canvas, rows, oi, false);
+  // Use rAF so the DOM has laid out and offsetWidth is correct
+  requestAnimationFrame(() => drawLBChart(canvas, rows, oi, false));
 }
 function renderLBChartIE() {
   const canvas = document.getElementById('lb-chart-ie');
   if (!canvas) return;
   const rows = ieRows.map(r => ({...r, avg: calcAvg(r.cycles)}));
-  drawLBChart(canvas, rows, ieMeta.oi, true);
+  requestAnimationFrame(() => drawLBChart(canvas, rows, ieMeta.oi, true));
 }
+// Redraw on window resize
+window.addEventListener('resize', () => {
+  const c1 = document.getElementById('lb-chart');
+  const c2 = document.getElementById('lb-chart-ie');
+  if (c1 && c1._rows) drawLBChart(c1, c1._rows, c1._oi, false);
+  if (c2 && c2._rows) drawLBChart(c2, c2._rows, c2._oi, true);
+});
 function drawLBChart(canvas, rows, oi, isLive) {
-  const W = canvas.offsetWidth || 900;
-  const H = 340;
-  canvas.width = W; canvas.height = H;
+  // Force canvas to fill its container before measuring
+  const wrap = canvas.parentElement;
+  const W = wrap ? wrap.clientWidth || wrap.offsetWidth || 960 : 960;
+  const H = 420;
+  canvas.style.width = '100%';
+  canvas.style.height = H + 'px';
+  canvas.width = W;
+  canvas.height = H;
+
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  const PAD = {top:20, right:20, bottom:70, left:50};
+  ctx.clearRect(0, 0, W, H);
+
+  const PAD = {top:24, right:24, bottom:90, left:56};
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
   const n = rows.length;
   if (!n) return;
-  const maxVal = Math.max(oi * 1.2, ...rows.map(r=>r.avg||calcAvg(r.cycles||[])));
-  const barW = Math.max(4, Math.floor(chartW / n * 0.72));
+
+  const avgs = rows.map(r => r.avg || calcAvg(r.cycles || []));
+  const maxVal = Math.max(oi * 1.15, ...avgs) * 1.05;
+
+  // Bar sizing — spread across the FULL chart width
+  const barW = Math.max(6, Math.floor(chartW / n * 0.78));
   const gap = chartW / n;
-  // Grid
-  ctx.strokeStyle = 'rgba(180,200,220,0.9)';
-  ctx.lineWidth = 1;
+
+  // Background
+  ctx.fillStyle = '#f8fafd';
+  ctx.fillRect(PAD.left, PAD.top, chartW, chartH);
+
+  // Grid lines & Y axis labels
   const gridLines = 6;
-  for (let g=0; g<=gridLines; g++) {
-    const y = PAD.top + chartH - (g/gridLines)*chartH;
-    const val = Math.round((g/gridLines)*maxVal);
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left+chartW, y); ctx.stroke();
-    ctx.fillStyle = '#4a6080'; ctx.font = '9px Segoe UI,sans-serif'; ctx.textAlign = 'right';
-    ctx.fillText(val, PAD.left-4, y+3);
+  for (let g = 0; g <= gridLines; g++) {
+    const y = PAD.top + chartH - (g / gridLines) * chartH;
+    const val = Math.round((g / gridLines) * maxVal);
+    ctx.strokeStyle = g === 0 ? 'rgba(100,140,180,0.5)' : 'rgba(180,200,220,0.7)';
+    ctx.lineWidth = g === 0 ? 1.5 : 1;
+    ctx.setLineDash(g === 0 ? [] : [3, 3]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + chartW, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#4a6080';
+    ctx.font = 'bold 10px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val, PAD.left - 6, y + 4);
   }
-  // Bars (stacked by VA category)
-  const VA_C = {'NVA':'#808080','Manpower':'#00b050','Machine':'#4472c4','Test Only':'#ffff00','Visual Inspection':'#ff6600','Visual+Test':'#ffc000','MP+Test':'#70ad47','MP+Machine':'#00b0f0'};
+
+  // Y axis label
+  ctx.save();
+  ctx.translate(13, PAD.top + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cycle Time (sec)', 0, 0);
+  ctx.restore();
+
+  const VA_C = {
+    'NVA':'#808080','Manpower':'#00b050','Machine':'#4472c4',
+    'Test Only':'#9a7a00','Visual Inspection':'#ff6600',
+    'Visual+Test':'#e6a800','MP+Test':'#70ad47','MP+Machine':'#00b0f0'
+  };
+
+  // Draw bars
   rows.forEach((r, i) => {
-    const avg = r.avg || calcAvg(r.cycles||[]);
-    if (!avg) return;
-    const x = PAD.left + i*gap + gap/2 - barW/2;
-    const cats = r.cats||[];
+    const avg = r.avg || calcAvg(r.cycles || []);
+    const x = PAD.left + i * gap + gap / 2 - barW / 2;
+    const cats = (r.cats || []).filter(c => VA_C[c]);
     const fillCats = cats.length ? cats : ['Manpower'];
-    const segH = (avg/maxVal)*chartH;
-    const perSeg = segH / fillCats.length;
+    const totalH = (avg / maxVal) * chartH;
+    const perSeg = totalH / fillCats.length;
     let yOff = 0;
     fillCats.forEach(cat => {
-      const col = VA_C[cat]||'#388bfd';
+      const col = VA_C[cat] || '#4472c4';
       ctx.fillStyle = col;
-      const sy = PAD.top + chartH - segH + yOff;
-      ctx.fillRect(x, sy, barW, perSeg);
+      const sy = PAD.top + chartH - totalH + yOff;
+      // Rounded top on last segment
+      if (yOff + perSeg >= totalH - 0.5) {
+        const r2 = Math.min(3, barW / 4);
+        ctx.beginPath();
+        ctx.moveTo(x + r2, sy);
+        ctx.lineTo(x + barW - r2, sy);
+        ctx.quadraticCurveTo(x + barW, sy, x + barW, sy + r2);
+        ctx.lineTo(x + barW, sy + perSeg);
+        ctx.lineTo(x, sy + perSeg);
+        ctx.lineTo(x, sy + r2);
+        ctx.quadraticCurveTo(x, sy, x + r2, sy);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, sy, barW, perSeg + 0.5);
+      }
       yOff += perSeg;
     });
-    // Station label
-    ctx.save(); ctx.translate(x + barW/2, PAD.top+chartH+6); ctx.rotate(-Math.PI/4);
-    ctx.fillStyle='#2a4a6a'; ctx.font='8px Segoe UI,sans-serif'; ctx.textAlign='right';
-    ctx.fillText(r.name||'', 0, 0); ctx.restore();
+
+    // Value label on top of bar
+    if (avg > 0 && totalH > 14) {
+      ctx.fillStyle = avg > oi ? '#c00' : '#003087';
+      ctx.font = 'bold 8px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(avg, x + barW / 2, PAD.top + chartH - totalH - 3);
+    }
+
+    // Station label (angled)
+    ctx.save();
+    ctx.translate(x + barW / 2, PAD.top + chartH + 8);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = '#2a4a6a';
+    ctx.font = '9px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText((r.name || '').length > 12 ? (r.name||'').slice(0,11)+'…' : (r.name||''), 0, 0);
+    ctx.restore();
   });
-  // OI line (magenta)
-  const oiY = PAD.top + chartH - (oi/maxVal)*chartH;
-  ctx.beginPath(); ctx.strokeStyle='#e31837'; ctx.lineWidth=2;
-  ctx.moveTo(PAD.left, oiY); ctx.lineTo(PAD.left+chartW, oiY); ctx.stroke();
-  ctx.fillStyle='#e31837'; ctx.font='bold 9px Segoe UI,sans-serif'; ctx.textAlign='left';
-  ctx.fillText('OI: '+oi+'s', PAD.left+4, oiY-4);
+
+  // OI line (Delta red)
+  if (oi > 0) {
+    const oiY = PAD.top + chartH - (oi / maxVal) * chartH;
+    ctx.beginPath();
+    ctx.strokeStyle = '#e31837';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 4]);
+    ctx.moveTo(PAD.left, oiY);
+    ctx.lineTo(PAD.left + chartW, oiY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // OI label badge
+    ctx.fillStyle = '#e31837';
+    ctx.beginPath();
+    ctx.roundRect(PAD.left + chartW - 58, oiY - 16, 56, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 9px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('OI: ' + oi + ' sec', PAD.left + chartW - 30, oiY - 5);
+  }
+
+  // X axis line
+  ctx.strokeStyle = 'rgba(100,140,180,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, PAD.top + chartH);
+  ctx.lineTo(PAD.left + chartW, PAD.top + chartH);
+  ctx.stroke();
 }
+
 
 
 // ════════════════════════════════════
